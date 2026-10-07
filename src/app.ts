@@ -64,7 +64,7 @@ export class App {
   run() {
     const { stdin, stdout } = process;
     if (!stdin.isTTY || !stdout.isTTY) {
-      console.error("todo needs an interactive terminal");
+      console.error("punch needs an interactive terminal");
       process.exit(1);
     }
     emitKeypressEvents(stdin);

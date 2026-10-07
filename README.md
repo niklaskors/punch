@@ -1,6 +1,6 @@
-# todo-tui
+# punch
 
-A simple todo list in the terminal. The input for a new todo sits on top; under it, every todo is
+Your punch list in the terminal: a simple todo list. The input for a new todo sits on top; under it, every todo is
 grouped by the day it was added, newest first.
 
 ```
@@ -24,9 +24,9 @@ grouped by the day it was added, newest first.
 Needs Node 22.18 or newer, which runs the TypeScript directly. There are no runtime dependencies.
 
 ```sh
-git clone git@github.com:niklaskors/todo-tui.git
-ln -s "$PWD/todo-tui/bin/todo.ts" ~/.local/bin/todo
-todo
+git clone git@github.com:niklaskors/punch.git
+ln -s "$PWD/punch/bin/punch.ts" ~/.local/bin/punch
+punch
 ```
 
 ## Keys
@@ -54,8 +54,8 @@ In the list:
 
 ## Data
 
-Todos are saved as JSON in `~/.local/share/todo-tui/todos.json` (or under `$XDG_DATA_HOME`).
-Set `TODO_FILE` to use another file.
+Todos are saved as JSON in `~/.local/share/punch/todos.json` (or under `$XDG_DATA_HOME`).
+Set `PUNCH_FILE` to use another file.
 
 ## Development
 

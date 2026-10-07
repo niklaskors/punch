@@ -1,14 +1,14 @@
 {
-  "name": "todo-tui",
+  "name": "punch",
   "version": "0.1.0",
   "description": "A simple todo list in the terminal, grouped by day",
   "private": true,
   "type": "module",
   "license": "MIT",
   "author": "Niklas Kors",
-  "repository": "github:niklaskors/todo-tui",
+  "repository": "github:niklaskors/punch",
   "bin": {
-    "todo": "bin/todo.ts"
+    "punch": "bin/punch.ts"
   },
   "engines": {
     "node": ">=22.18"

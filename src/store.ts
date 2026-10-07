@@ -13,9 +13,9 @@ export interface Todo {
   done: string | null;
 }
 
-/** $TODO_FILE, or todos.json in the XDG data directory. */
+/** $PUNCH_FILE, or todos.json in the XDG data directory. */
 export const dataFile = () =>
-  process.env.TODO_FILE || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "todo-tui", "todos.json");
+  process.env.PUNCH_FILE || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "punch", "todos.json");
 
 export function load(file: string): Todo[] {
   try {
