@@ -34,9 +34,9 @@ In the input:
 
 | Key | |
 | --- | --- |
-| `enter` | add the todo (or save the edit) |
+| `enter` | add the todo |
 | `↓` / `tab` | go to the list |
-| `esc` | clear the input (or cancel the edit) |
+| `esc` | clear the input |
 | `^A` `^E` `^U` `^K` `^W` | the usual line editing |
 | `^C` | quit |
 
@@ -46,7 +46,7 @@ In the list:
 | --- | --- |
 | `↑` `↓` / `k` `j` | move (up from the first todo goes back to the input) |
 | `space` / `x` / `enter` | mark as done, or open again |
-| `e` | edit |
+| `e` | edit the todo in place: `enter` saves, `esc` cancels |
 | `d` | delete, `u` to undo |
 | `i` / `esc` / `tab` | back to the input |
 | `q` | quit |

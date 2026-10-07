@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { dayKey, groupByDay } from "./days.ts";
 import { load, save, type Todo } from "./store.ts";
 import { contentWidth, footer, LineInput, openScreen, paint, screenHeight, type Key } from "./term.ts";
-import { fill, shorten, theme, type Line } from "./theme.ts";
+import { fill, lineLen, shorten, theme, type Line, type Segment } from "./theme.ts";
 
 /** Rows above the list: the header, a blank line, the input's label and the input, and a blank line. */
 const LIST_TOP = 5;
@@ -28,10 +28,11 @@ type Row =
 
 export class App {
   todos: Todo[];
-  focus: "input" | "list" = "input";
+  /** The new-todo input, the list, or the selected todo being edited in its row. */
+  focus: "input" | "list" | "edit" = "input";
   input = new LineInput();
-  /** The todo the input edits; null when it adds a new one. */
-  editing: string | null = null;
+  /** The selected todo's text while it is edited. */
+  edit = new LineInput();
   /** Index of the selected todo, in the order they are shown. */
   sel = 0;
   /** The first list row on screen. */
@@ -77,6 +78,7 @@ export class App {
   key(str: string | undefined, key: Key) {
     this.msg = "";
     if (this.focus === "input") this.inputKey(str, key);
+    else if (this.focus === "edit") this.editKey(str, key);
     else this.listKey(key);
   }
 
@@ -87,42 +89,40 @@ export class App {
       case "enter":
         return this.submit();
       case "escape":
-        if (this.editing) return this.stopEditing();
         this.input.set("");
         return;
       case "down":
       case "tab":
-        if (this.editing) this.stopEditing();
-        else if (this.todos.length) this.focus = "list";
+        if (this.todos.length) this.focus = "list";
         return;
       case "^d":
-        if (!this.input.text && !this.editing) process.exit(0);
+        if (!this.input.text) process.exit(0);
     }
+  }
+
+  /** Editing in the todo's own row: enter saves, escape leaves it as it was. */
+  editKey(str: string | undefined, key: Key) {
+    if (this.edit.key(str, key)) return;
+    if (key.name === "return" || key.name === "enter") {
+      const text = this.edit.text.trim();
+      const todo = this.shown[this.sel];
+      if (text && todo && text !== todo.text) {
+        todo.text = text;
+        this.persist();
+      }
+      this.focus = "list";
+    } else if (key.name === "escape") this.focus = "list";
   }
 
   submit() {
     const text = this.input.text.trim();
     if (!text) return;
-    if (this.editing) {
-      const todo = this.todos.find((t) => t.id === this.editing);
-      if (todo) todo.text = text;
-      this.persist();
-      this.stopEditing();
-      return;
-    }
     const todo: Todo = { id: randomUUID(), text, created: new Date().toISOString(), done: null };
     this.todos.push(todo);
     this.persist();
     this.input.set("");
     this.sel = this.shown.indexOf(todo);
     this.scroll = 0;
-  }
-
-  stopEditing() {
-    this.sel = Math.max(0, this.shown.findIndex((t) => t.id === this.editing));
-    this.editing = null;
-    this.input.set("");
-    this.focus = "list";
   }
 
   listKey(key: Key) {
@@ -155,9 +155,8 @@ export class App {
         return;
       case "e":
         if (!todo) return;
-        this.editing = todo.id;
-        this.input.set(todo.text);
-        this.focus = "input";
+        this.edit.set(todo.text);
+        this.focus = "edit";
         return;
       case "d":
       case "delete":
@@ -219,45 +218,42 @@ export class App {
   inputLine(width: number): { line: Line; col: number } {
     const focused = this.focus === "input";
     const base = focused ? "cardsel" : "card";
-    const icon = this.editing ? theme.icons.edit : theme.icons.add;
     const lead: Line = [[focused ? theme.icons.barSel : theme.icons.bar, `${base}+${focused ? "info" : "track"}`], [" ", base],
-      [icon, `${base}+${focused ? "accent" : "dim"}`], [" ", base]];
+      [theme.icons.add, `${base}+${focused ? "accent" : "dim"}`], [" ", base]];
     const view = this.input.view(width - 4);
-    const body: Line = this.input.chars.length || this.editing
-      ? [[view.text, base]]
-      : [["What needs doing?", `${base}+dim`]];
+    const body: Line = this.input.chars.length ? [[view.text, base]] : [["What needs doing?", `${base}+dim`]];
     return { line: fill([...lead, ...body], width, base), col: 4 + view.col };
   }
 
-  todoLine(todo: Todo, selected: boolean, width: number): Line {
+  /** A todo as a card; the one being edited holds the edit input, with the cursor at `col`. */
+  todoLine(todo: Todo, selected: boolean, width: number): { line: Line; col: number } {
     const base = selected ? "cardsel" : "card";
-    const bar = todo.done ? "done" : selected ? "info" : "track";
-    const mark: Line = todo.done ? [[theme.icons.done, `${base}+done`]] : [[theme.icons.open, `${base}+dim`]];
-    const text = shorten(todo.text, width - 3 - theme.icons.open.length);
-    return fill([
-      [selected ? theme.icons.barSel : theme.icons.bar, `${base}+${bar}`], [" ", base], ...mark, [" ", base],
-      [text, todo.done ? `${base}+dim+strike` : selected ? `${base}+title` : base],
-    ], width, base);
+    const editing = selected && this.focus === "edit";
+    const bar = editing ? "info" : todo.done ? "done" : selected ? "info" : "track";
+    const mark: Segment = editing ? [theme.icons.edit, `${base}+accent`]
+      : todo.done ? [theme.icons.done, `${base}+done`] : [theme.icons.open, `${base}+dim`];
+    const lead: Line = [[selected ? theme.icons.barSel : theme.icons.bar, `${base}+${bar}`], [" ", base], mark, [" ", base]];
+    const room = width - lineLen(lead);
+    if (editing) {
+      const view = this.edit.view(room);
+      return { line: fill([...lead, [view.text, base]], width, base), col: lineLen(lead) + view.col };
+    }
+    const look = todo.done ? `${base}+dim+strike` : selected ? `${base}+title` : base;
+    return { line: fill([...lead, [shorten(todo.text, room), look]], width, base), col: 0 };
   }
 
   draw() {
     const width = contentWidth();
     const height = screenHeight();
-    const inputFocused = this.focus === "input";
     const input = this.inputLine(width);
-    const out: Line[] = [
-      this.header(),
-      [],
-      this.label(this.editing ? "EDIT TODO" : "NEW TODO", inputFocused),
-      input.line,
-      [],
-    ];
+    const out: Line[] = [this.header(), [], this.label("NEW TODO", this.focus === "input"), input.line, []];
+    let cursor: [number, number] | null = this.focus === "input" ? [INPUT_ROW, input.col] : null;
 
     // The list, scrolled so the selected todo (and if possible its day) is on screen.
     const rows = this.rows();
     const room = Math.max(1, height - LIST_TOP - FOOTER);
     const selRow = rows.findIndex((r) => r.kind === "todo" && r.index === this.sel);
-    if (this.focus === "list" && selRow >= 0) {
+    if (this.focus !== "input" && selRow >= 0) {
       const want = rows[selRow - 1]?.kind === "rule" ? selRow - 2 : selRow;
       if (want < this.scroll) this.scroll = want;
       if (selRow >= this.scroll + room) this.scroll = selRow - room + 1;
@@ -268,14 +264,19 @@ export class App {
       if (row.kind === "gap") out.push([]);
       else if (row.kind === "rule") out.push([["─".repeat(width), "rule"]]);
       else if (row.kind === "day") out.push(this.label(row.label.toUpperCase(), false, `${row.done}/${row.total} done`, row.done === row.total));
-      else out.push(this.todoLine(row.todo, this.focus === "list" && row.index === this.sel, width));
+      else {
+        const selected = this.focus !== "input" && row.index === this.sel;
+        const todo = this.todoLine(row.todo, selected, width);
+        if (selected && this.focus === "edit") cursor = [out.length, todo.col];
+        out.push(todo.line);
+      }
     }
 
     while (out.length < height - 1) out.push([]);
-    const keys = this.editing ? EDIT_KEYS : inputFocused ? INPUT_KEYS : LIST_KEYS;
+    const keys = this.focus === "edit" ? EDIT_KEYS : this.focus === "input" ? INPUT_KEYS : LIST_KEYS;
     out[height - 1] = footer(keys, width, this.msg);
 
-    // The terminal's own cursor shows in the input, and is hidden while moving through the list.
-    paint(out, inputFocused ? [INPUT_ROW, input.col] : null);
+    // The terminal's own cursor shows where text is typed, and is hidden while moving through the list.
+    paint(out, cursor);
   }
 }
