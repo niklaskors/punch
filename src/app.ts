@@ -14,10 +14,11 @@ const INPUT_ROW = 3;
 const FOOTER = 2;
 const BAR_W = 20;
 
-const INPUT_KEYS: [string, string][] = [["⏎", "add"], ["↓", "todos"], ["esc", "clear"], ["^C", "quit"]];
+const FIELD_KEYS: [string, string][] = [["⏎", "new todo"], ["↓", "todos"], ["u", "undo"], ["q", "quit"]];
+const INPUT_KEYS: [string, string][] = [["⏎", "add"], ["esc", "stop typing"], ["↓", "todos"], ["^C", "quit"]];
 const EDIT_KEYS: [string, string][] = [["⏎", "save"], ["esc", "cancel"], ["^C", "quit"]];
 const LIST_KEYS: [string, string][] = [
-  ["␣", "done"], ["↑↓", "move"], ["i", "new"], ["e", "edit"], ["d", "delete"], ["u", "undo"], ["q", "quit"],
+  ["␣", "done"], ["↑↓", "move"], ["e", "edit"], ["d", "delete"], ["u", "undo"], ["q", "quit"],
 ];
 
 type Row =
@@ -28,8 +29,11 @@ type Row =
 
 export class App {
   todos: Todo[];
-  /** The new-todo input, the list, or the selected todo being edited in its row. */
-  focus: "input" | "list" | "edit" = "input";
+  /**
+   * The new-todo field (selected, but keys don't type in it until enter is pressed), typing in it, the list,
+   * or the selected todo being edited in its row.
+   */
+  focus: "field" | "input" | "list" | "edit" = "field";
   input = new LineInput();
   /** The selected todo's text while it is edited. */
   edit = new LineInput();
@@ -77,9 +81,28 @@ export class App {
 
   key(str: string | undefined, key: Key) {
     this.msg = "";
-    if (this.focus === "input") this.inputKey(str, key);
+    if (this.focus === "field") this.fieldKey(key);
+    else if (this.focus === "input") this.inputKey(str, key);
     else if (this.focus === "edit") this.editKey(str, key);
     else this.listKey(key);
+  }
+
+  fieldKey(key: Key) {
+    switch (key.name) {
+      case "return":
+      case "enter":
+        this.focus = "input";
+        return;
+      case "down":
+      case "j":
+      case "tab":
+        if (this.todos.length) this.focus = "list";
+        return;
+      case "u":
+        return this.undo();
+      case "q":
+        process.exit(0);
+    }
   }
 
   inputKey(str: string | undefined, key: Key) {
@@ -89,7 +112,7 @@ export class App {
       case "enter":
         return this.submit();
       case "escape":
-        this.input.set("");
+        this.focus = "field";
         return;
       case "down":
       case "tab":
@@ -116,7 +139,10 @@ export class App {
 
   submit() {
     const text = this.input.text.trim();
-    if (!text) return;
+    if (!text) {
+      this.focus = "field";
+      return;
+    }
     const todo: Todo = { id: randomUUID(), text, created: new Date().toISOString(), done: null };
     this.todos.push(todo);
     this.persist();
@@ -131,7 +157,7 @@ export class App {
     switch (key.name) {
       case "up":
       case "k":
-        if (this.sel === 0) this.focus = "input";
+        if (this.sel === 0) this.focus = "field";
         else this.sel--;
         return;
       case "down":
@@ -166,26 +192,27 @@ export class App {
         this.todos.splice(this.removed.at, 1);
         this.persist();
         this.msg = `Deleted “${shorten(todo.text, 30)}” · u to undo`;
-        if (!this.todos.length) this.focus = "input";
+        if (!this.todos.length) this.focus = "field";
         this.sel = Math.max(0, Math.min(this.sel, this.todos.length - 1));
         return;
       case "u":
-        if (!this.removed) return;
-        this.todos.splice(this.removed.at, 0, this.removed.todo);
-        this.persist();
-        this.sel = this.shown.indexOf(this.removed.todo);
-        this.removed = null;
-        return;
+        return this.undo();
       case "q":
         process.exit(0);
       case "escape":
       case "tab":
-      case "i":
-      case "a":
-      case "n":
-      case "/":
-        this.focus = "input";
+        this.focus = "field";
     }
+  }
+
+  /** Brings back the todo deleted last, selected in the list. */
+  undo() {
+    if (!this.removed) return;
+    this.todos.splice(this.removed.at, 0, this.removed.todo);
+    this.persist();
+    this.sel = this.shown.indexOf(this.removed.todo);
+    this.removed = null;
+    this.focus = "list";
   }
 
   // -- drawing
@@ -214,14 +241,15 @@ export class App {
     return [[theme.icons.dot ? `${theme.icons.dot} ` : "", color], [text, `title+${color}`], [count ? `  ${count}` : "", "name"]];
   }
 
-  /** The input as a card, its bar lit while it has focus. */
+  /** The new-todo field as a card, its bar lit while it is selected; it shows a cursor once enter is pressed. */
   inputLine(width: number): { line: Line; col: number } {
-    const focused = this.focus === "input";
+    const focused = this.focus === "field" || this.focus === "input";
     const base = focused ? "cardsel" : "card";
     const lead: Line = [[focused ? theme.icons.barSel : theme.icons.bar, `${base}+${focused ? "info" : "track"}`], [" ", base],
       [theme.icons.add, `${base}+${focused ? "accent" : "dim"}`], [" ", base]];
     const view = this.input.view(width - 4);
-    const body: Line = this.input.chars.length ? [[view.text, base]] : [["What needs doing?", `${base}+dim`]];
+    const hint = this.focus === "input" ? "What needs doing?" : "Press enter to add a todo";
+    const body: Line = this.input.chars.length ? [[view.text, base]] : [[hint, `${base}+dim`]];
     return { line: fill([...lead, ...body], width, base), col: 4 + view.col };
   }
 
@@ -246,26 +274,26 @@ export class App {
     const width = contentWidth();
     const height = screenHeight();
     const input = this.inputLine(width);
-    const out: Line[] = [this.header(), [], this.label("NEW TODO", this.focus === "input"), input.line, []];
+    const out: Line[] = [this.header(), [], this.label("NEW TODO", this.focus === "field" || this.focus === "input"), input.line, []];
     let cursor: [number, number] | null = this.focus === "input" ? [INPUT_ROW, input.col] : null;
 
     // The list, scrolled so the selected todo (and if possible its day) is on screen.
     const rows = this.rows();
     const room = Math.max(1, height - LIST_TOP - FOOTER);
     const selRow = rows.findIndex((r) => r.kind === "todo" && r.index === this.sel);
-    if (this.focus !== "input" && selRow >= 0) {
+    if ((this.focus === "list" || this.focus === "edit") && selRow >= 0) {
       const want = rows[selRow - 1]?.kind === "rule" ? selRow - 2 : selRow;
       if (want < this.scroll) this.scroll = want;
       if (selRow >= this.scroll + room) this.scroll = selRow - room + 1;
     }
     this.scroll = Math.max(0, Math.min(this.scroll, rows.length - room));
-    if (!rows.length) out.push([["Nothing here yet. Type a todo above and press enter.", "empty"]]);
+    if (!rows.length) out.push([["Nothing here yet. Press enter to add your first todo.", "empty"]]);
     for (const row of rows.slice(this.scroll, this.scroll + room)) {
       if (row.kind === "gap") out.push([]);
       else if (row.kind === "rule") out.push([["─".repeat(width), "rule"]]);
       else if (row.kind === "day") out.push(this.label(row.label.toUpperCase(), false, `${row.done}/${row.total} done`, row.done === row.total));
       else {
-        const selected = this.focus !== "input" && row.index === this.sel;
+        const selected = (this.focus === "list" || this.focus === "edit") && row.index === this.sel;
         const todo = this.todoLine(row.todo, selected, width);
         if (selected && this.focus === "edit") cursor = [out.length, todo.col];
         out.push(todo.line);
@@ -273,10 +301,10 @@ export class App {
     }
 
     while (out.length < height - 1) out.push([]);
-    const keys = this.focus === "edit" ? EDIT_KEYS : this.focus === "input" ? INPUT_KEYS : LIST_KEYS;
+    const keys = { field: FIELD_KEYS, input: INPUT_KEYS, list: LIST_KEYS, edit: EDIT_KEYS }[this.focus];
     out[height - 1] = footer(keys, width, this.msg);
 
-    // The terminal's own cursor shows where text is typed, and is hidden while moving through the list.
+    // The terminal's own cursor shows where text is typed, and is hidden otherwise.
     paint(out, cursor);
   }
 }

@@ -30,13 +30,24 @@ Run `punch --setup` to choose again; your todos are copied to the new place.
 
 ## Keys
 
-In the input:
+punch starts on the new todo field. Keys there are commands, until you press `enter` to start typing.
+
+On the new todo field:
 
 | Key | |
 | --- | --- |
-| `enter` | add the todo |
+| `enter` | start typing a new todo |
 | `↓` / `tab` | go to the list |
-| `esc` | clear the input |
+| `u` | undo a delete |
+| `q` | quit |
+
+While typing a new todo:
+
+| Key | |
+| --- | --- |
+| `enter` | add the todo, and keep typing the next one |
+| `esc` | stop typing (what you typed stays) |
+| `↓` / `tab` | go to the list |
 | `^A` `^E` `^U` `^K` `^W` | the usual line editing |
 | `^C` | quit |
 
@@ -44,11 +55,11 @@ In the list:
 
 | Key | |
 | --- | --- |
-| `↑` `↓` / `k` `j` | move (up from the first todo goes back to the input) |
+| `↑` `↓` / `k` `j` | move (up from the first todo goes back to the new todo field) |
 | `space` / `x` / `enter` | mark as done, or open again |
 | `e` | edit the todo in place: `enter` saves, `esc` cancels |
 | `d` | delete, `u` to undo |
-| `i` / `esc` / `tab` | back to the input |
+| `esc` / `tab` | back to the new todo field |
 | `q` | quit |
 
 ## Data
@@ -62,10 +73,15 @@ it never starts from an empty list and overwrites the real one.
 ## Development
 
 ```sh
-npm install      # only TypeScript and Node's types, for checking
+npm install      # tools for checking and testing; punch itself has no dependencies
 npm run check    # type-check
-npm test
+npm test         # Vitest
 ```
+
+The integration tests in `test/punch.test.ts` run the real `punch` command in a pseudo-terminal
+([node-pty](https://github.com/microsoft/node-pty)), read its screen with a headless
+[xterm.js](https://xtermjs.org), and press keys like you would. Each test gets its own temporary home folder,
+so your own todos and settings are never touched.
 
 ## License
 
