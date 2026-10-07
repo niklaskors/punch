@@ -3,21 +3,7 @@
 Your punch list in the terminal: a simple todo list. The input for a new todo sits on top; under it, every todo is
 grouped by the day it was added, newest first.
 
-```
-  ╭─ New todo ─────────────────────────────────────────────────────╮
-  │ + What needs doing?                                            │
-  ╰────────────────────────────────────────────────────────────────╯
-
-  Today  1/2 done
-    ○ Call mum
-    ✓ Buy milk
-
-  Yesterday  1/2 done
-  › ○ Book dentist appointment
-    ✓ Water the plants
-
-  ␣ done  e edit  d delete  u undo  ↑↓ move  i new  q quit
-```
+![punch showing todos grouped by day in the terminal](docs/screenshot.png)
 
 ## Install
 
@@ -28,6 +14,19 @@ git clone git@github.com:niklaskors/punch.git
 ln -s "$PWD/punch/bin/punch.ts" ~/.local/bin/punch
 punch
 ```
+
+The first time it starts, punch asks where to save your todos:
+
+- **iCloud Drive** (on a Mac): synced across your Macs. Pick it on each Mac and they share one list.
+- **This Mac only**: `~/.local/share/punch/todos.json`.
+- **Somewhere else**: any folder or `.json` file, e.g. in Dropbox or a git repo.
+
+Run `punch --setup` to choose again; your todos are copied to the new place.
+
+## Themes
+
+`-t night` (default, dark), `-t day` (light terminals) or `-t classic` (16 colours), or set `PUNCH_THEME`.
+24-bit colour is used when `$COLORTERM` says so.
 
 ## Keys
 
@@ -54,8 +53,11 @@ In the list:
 
 ## Data
 
-Todos are saved as JSON in `~/.local/share/punch/todos.json` (or under `$XDG_DATA_HOME`).
-Set `PUNCH_FILE` to use another file.
+Todos are one JSON file, in the place chosen at setup. That choice is kept in `~/.config/punch/config.json`
+(or under `$XDG_CONFIG_HOME`). Set `PUNCH_FILE` to use another file regardless.
+
+When iCloud keeps the file only in the cloud ("Optimise Mac Storage"), punch downloads it before starting, so
+it never starts from an empty list and overwrites the real one.
 
 ## Development
 
