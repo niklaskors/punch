@@ -106,6 +106,17 @@ describe("first-time setup", () => {
 });
 
 describe("the todo list", () => {
+  it("stops typing as soon as escape is pressed", async () => {
+    home.configure();
+    const app = await start();
+    await app.type(KEYS.enter, "draft");
+    const pressed = Date.now();
+    app.pty.write(KEYS.esc);
+    // The key hints change from typing ("esc stop typing") back to the field's ("⏎ new todo").
+    await app.waitFor((text) => text.includes("new todo") && !text.includes("stop typing"));
+    expect(Date.now() - pressed).toBeLessThan(250);
+  });
+
   it("starts on the new todo field, but only types in it after enter", async () => {
     home.configure();
     const app = await start();

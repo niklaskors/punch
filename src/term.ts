@@ -6,6 +6,7 @@ import { ansi, chars, lineLen, shorten, theme, type Line, type Segment, type Sty
 /** Left margin of everything on screen. */
 export const MARGIN = 2;
 export const MAX_WIDTH = 100;
+const ESCAPE_MS = 50;
 
 export interface Key {
   name?: string;
@@ -35,7 +36,9 @@ export function openScreen(onKey: KeyHandler, draw: () => void) {
     process.exit(1);
   }
   opened = true;
-  emitKeypressEvents(stdin);
+  // A lone escape is only told apart from the start of a key sequence after a wait, 500ms by default; readline
+  // only reads that from its interface argument. 50ms makes escape react at once, as in jboard.
+  emitKeypressEvents(stdin, { escapeCodeTimeout: ESCAPE_MS } as never);
   stdin.setRawMode(true);
   stdout.write("\x1b[?1049h");
   process.on("exit", closeScreen);

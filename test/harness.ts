@@ -111,8 +111,7 @@ export class Punch {
   async type(...keys: string[]) {
     for (const key of keys) {
       this.pty.write(key);
-      // A lone escape is only known to be one after a short wait (readline's escape timeout).
-      await new Promise((r) => setTimeout(r, key === KEYS.esc ? 600 : 30));
+      await new Promise((r) => setTimeout(r, 30));
     }
     await this.settle();
   }
